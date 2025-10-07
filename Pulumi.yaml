@@ -1,4 +1,4 @@
-name: data-lake-and-warehouse
+name: lakehouse
 description: AWS Infrastructure and Snowflake Configuration with Pulumi
 runtime:
   name: nodejs
