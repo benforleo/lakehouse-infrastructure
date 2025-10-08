@@ -1,6 +1,5 @@
 import * as aws from '@pulumi/aws'
 import * as awsx from '@pulumi/awsx'
-import {config} from "@pulumi/aws";
 
 export class PolarisECS {
     constructor() {
@@ -55,31 +54,34 @@ export class PolarisECS {
             }]
         });
 
-        // const taskDefinition = new aws.ecs.TaskDefinition("PolarisTask", {
-        //     family: 'polaris-task',
-        //     containerDefinitions: JSON.stringify({
-        //
-        //     }),
-        // });
-
-        // const taskDefinition = new awsx.ecs.FargateTaskDefinition("PolarisTask", {
-        //     container: {
-        //         image: '429414942599.dkr.ecr.us-east-1.amazonaws.com/polaris:1.1.0-incubating',
-        //         name: 'polaris'
-        //     },
-        //     cpu: '1024',
-        //     executionRole: {
-        //         roleArn: executionRole.arn,
-        //     },
-        //     family: 'polaris-task',
-        //     logGroup: {
-        //         existing: {
-        //             arn: logGroup.arn
-        //         }
-        //     },
-        //     memory: '2048',
-        //
-        //
-        // });
+        const taskDefinition = new awsx.ecs.FargateTaskDefinition("PolarisTask", {
+            container: {
+                image: '429414942599.dkr.ecr.us-east-1.amazonaws.com/polaris:1.1.0-incubating',
+                name: 'polaris',
+                essential: true,
+                portMappings: [{ containerPort: 8081, protocol: 'tcp' }],
+                // secrets: [
+                //     {
+                //         name: 'QUARKUS_DATASOURCE_USERNAME',
+                //         valueFrom: 'arn:aws:ssm:us-east-1:429414942599:parameter/polaris/AWS_ACCESS_KEY_ID'
+                //     }
+                // ]
+            },
+            cpu: '1024',
+            executionRole: {
+                roleArn: executionRole.arn,
+            },
+            family: 'polaris-task',
+            logGroup: {
+                existing: {
+                    arn: logGroup.arn
+                }
+            },
+            memory: '2048',
+            taskRole: {
+                roleArn: taskRole.arn,
+            },
+            skipDestroy: false,
+        });
     }
 }
