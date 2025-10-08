@@ -5,6 +5,40 @@ import {config} from "@pulumi/aws";
 export class PolarisECS {
     constructor() {
 
+        const executionRole = new aws.iam.Role("PolarisExecutionRole", {
+            name: 'polaris-execution-role',
+            assumeRolePolicy: JSON.stringify({
+                Version: "2012-10-17",
+                Statement: [
+                    {
+                        Action: "sts:AssumeRole",
+                        Principal: {
+                            Service: "ecs-tasks.amazonaws.com",
+                        },
+                        Effect: "Allow",
+                    },
+                ],
+            }),
+            managedPolicyArns:[aws.iam.ManagedPolicy.AmazonECSTaskExecutionRolePolicy]
+        });
+
+        const taskRole = new aws.iam.Role("PolarisTaskRole", {
+            name: 'polaris-task-role',
+            assumeRolePolicy: JSON.stringify({
+                Version: "2012-10-17",
+                Statement: [
+                    {
+                        Action: "sts:AssumeRole",
+                        Principal: {
+                            Service: "ecs-tasks.amazonaws.com",
+                        },
+                        Effect: "Allow",
+                    },
+                ],
+            }),
+            managedPolicyArns:[aws.iam.ManagedPolicy.AmazonECSTaskExecutionRolePolicy]
+        });
+
         const logGroup = new aws.cloudwatch.LogGroup("PolarisLogGroup", {
             name: "/aws-ecs/polaris",
             retentionInDays: 7,
@@ -34,10 +68,15 @@ export class PolarisECS {
         //         name: 'polaris'
         //     },
         //     cpu: '1024',
+        //     executionRole: {
+        //         roleArn: executionRole.arn,
+        //     },
         //     family: 'polaris-task',
         //     logGroup: {
-        //         args: {}
-        //     }
+        //         existing: {
+        //             arn: logGroup.arn
+        //         }
+        //     },
         //     memory: '2048',
         //
         //
