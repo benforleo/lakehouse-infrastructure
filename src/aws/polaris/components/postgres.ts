@@ -3,7 +3,7 @@ import {Config} from "@pulumi/pulumi";
 
 
 export class PolarisPostgresDB {
-
+    public readonly rdsInstance: aws.rds.Instance;
     constructor(cfg: Config) {
 
         const defaultVpc = aws.ec2.getVpcOutput({
@@ -24,7 +24,7 @@ export class PolarisPostgresDB {
             cidrIpv4: "0.0.0.0/0",
         });
 
-        const rdsInstance = new aws.rds.Instance("PolarisPostgresDB", {
+        this.rdsInstance = new aws.rds.Instance("PolarisPostgresDB", {
             identifier: "polaris-postgres-db",
             instanceClass: aws.rds.InstanceType.T4G_Micro,
             allowMajorVersionUpgrade: false,

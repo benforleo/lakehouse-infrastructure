@@ -7,7 +7,7 @@ import * as ecr from "./components/ecr";
 export class Polaris {
     constructor(config: pulumi.Config) {
         new ecr.ECR();
-        new PolarisPostgresDB(config);
-        new PolarisECS();
+        const dbConfig = new PolarisPostgresDB(config);
+        new PolarisECS(config, dbConfig.rdsInstance);
     }
 }

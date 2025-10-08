@@ -1,8 +1,11 @@
 import * as aws from '@pulumi/aws'
 import * as awsx from '@pulumi/awsx'
+import * as pulumi from "@pulumi/pulumi";
 
 export class PolarisECS {
-    constructor() {
+    constructor(config: pulumi.Config, polarisDb: aws.rds.Instance) {
+
+        const currentIdentity = aws.getCallerIdentity({});
 
         const executionRole = new aws.iam.Role("PolarisExecutionRole", {
             name: 'polaris-execution-role',
@@ -18,7 +21,25 @@ export class PolarisECS {
                     },
                 ],
             }),
-            managedPolicyArns:[aws.iam.ManagedPolicy.AmazonECSTaskExecutionRolePolicy]
+            managedPolicyArns: [aws.iam.ManagedPolicy.AmazonECSTaskExecutionRolePolicy],
+            inlinePolicies: [
+                {
+                    name: "AWSSecretsManagerReadOnly",
+                    policy: JSON.stringify({
+                        Version: "2012-10-17",
+                        Statement: [
+                            {
+                                Effect: "Allow",
+                                Action: [
+                                    "secretsmanager:GetSecretValue",
+                                    "secretsmanager:DescribeSecret"
+                                ],
+                                Resource: "*"
+                            }
+                        ]
+                    })
+                }
+            ]
         });
 
         const taskRole = new aws.iam.Role("PolarisTaskRole", {
@@ -35,7 +56,7 @@ export class PolarisECS {
                     },
                 ],
             }),
-            managedPolicyArns:[aws.iam.ManagedPolicy.AmazonECSTaskExecutionRolePolicy]
+            managedPolicyArns: [aws.iam.ManagedPolicy.AmazonECSTaskExecutionRolePolicy]
         });
 
         const logGroup = new aws.cloudwatch.LogGroup("PolarisLogGroup", {
@@ -54,18 +75,35 @@ export class PolarisECS {
             }]
         });
 
+
         const taskDefinition = new awsx.ecs.FargateTaskDefinition("PolarisTask", {
             container: {
-                image: '429414942599.dkr.ecr.us-east-1.amazonaws.com/polaris:1.1.0-incubating',
+                image: currentIdentity.then(identity => `${identity.accountId}.dkr.ecr.us-east-1.amazonaws.com/polaris:1.1.0-incubating`),
                 name: 'polaris',
                 essential: true,
-                portMappings: [{ containerPort: 8081, protocol: 'tcp' }],
-                // secrets: [
-                //     {
-                //         name: 'QUARKUS_DATASOURCE_USERNAME',
-                //         valueFrom: 'arn:aws:ssm:us-east-1:429414942599:parameter/polaris/AWS_ACCESS_KEY_ID'
-                //     }
-                // ]
+                portMappings: [{containerPort: 8081, protocol: 'tcp'}],
+                environment: [
+                    {name: 'POLARIS_PERSISTENCE_TYPE', value: 'relational-jdbc'},
+                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: polarisDb.address},
+                    {name: 'POLARIS_REALM_CONTEXT_REALMS', value: 'POLARIS'},
+                    {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'true'},
+                ],
+                secrets: [
+                    {
+                        name: 'QUARKUS_DATASOURCE_USERNAME',
+                        valueFrom: currentIdentity.then(
+                            identity =>
+                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ/QUARKUS_DATASOURCE_USERNAME`
+                        )
+                    },
+                    {
+                        name: 'QUARKUS_DATASOURCE_PASSWORD',
+                        valueFrom: currentIdentity.then(
+                            identity =>
+                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ/QUARKUS_DATASOURCE_PASSWORD`
+                        )
+                    }
+                ]
             },
             cpu: '1024',
             executionRole: {
