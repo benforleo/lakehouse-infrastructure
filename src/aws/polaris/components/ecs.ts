@@ -31,8 +31,9 @@ export class PolarisECS {
                             {
                                 Effect: "Allow",
                                 Action: [
-                                    "secretsmanager:GetSecretValue",
-                                    "secretsmanager:DescribeSecret"
+                                    "secretsmanager:*",
+                                    // "secretsmanager:GetSecretValue",
+                                    // "secretsmanager:DescribeSecret"
                                 ],
                                 Resource: "*"
                             }
@@ -84,7 +85,7 @@ export class PolarisECS {
                 portMappings: [{containerPort: 8081, protocol: 'tcp'}],
                 environment: [
                     {name: 'POLARIS_PERSISTENCE_TYPE', value: 'relational-jdbc'},
-                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: pulumi.interpolate`${polarisDb.address}:5432/polaris`},
+                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: pulumi.interpolate`jdbc:postgresql://${polarisDb.address}:5432/polaris`},
                     {name: 'POLARIS_REALM_CONTEXT_REALMS', value: 'POLARIS'},
                     {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'true'},
                 ],
@@ -93,17 +94,21 @@ export class PolarisECS {
                         name: 'QUARKUS_DATASOURCE_USERNAME',
                         valueFrom: currentIdentity.then(
                             identity =>
-                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ`
+                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ:QUARKUS_DATASOURCE_USERNAME::`
                         )
                     },
                     {
                         name: 'QUARKUS_DATASOURCE_PASSWORD',
                         valueFrom: currentIdentity.then(
                             identity =>
-                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ`
+                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ:QUARKUS_DATASOURCE_PASSWORD::`
                         )
                     }
                 ]
+            },
+            runtimePlatform: {
+                cpuArchitecture: "ARM64",
+                operatingSystemFamily: "LINUX",
             },
             cpu: '1024',
             executionRole: {
@@ -148,20 +153,21 @@ export class PolarisECS {
         });
 
 
-        // new awsx.ecs.FargateService("PolarisService", {
-        //     name: "polaris",
-        //     cluster: cluster.arn,
-        //     forceNewDeployment: true,
-        //     desiredCount: 1,
-        //     forceDelete: true,
-        //     deploymentCircuitBreaker: {enable: true, rollback: true},
-        //     networkConfiguration: {
-        //         subnets: subnets.ids,
-        //         assignPublicIp: true,
-        //         securityGroups: [ecsSecurityGroup.id]
-        //     },
-        //     taskDefinition: taskDefinition.taskDefinition.arn
-        // });
+        new awsx.ecs.FargateService("PolarisService", {
+            name: "polaris",
+            platformVersion: "1.4.0",
+            cluster: cluster.arn,
+            forceNewDeployment: true,
+            desiredCount: 1,
+            forceDelete: true,
+            deploymentCircuitBreaker: {enable: true, rollback: true},
+            networkConfiguration: {
+                subnets: subnets.ids,
+                assignPublicIp: true,
+                securityGroups: [ecsSecurityGroup.id]
+            },
+            taskDefinition: taskDefinition.taskDefinition.arn
+        });
 
         // arn:aws:secretsmanager:us-east-1:429414942599:secret:dev/polaris/postgres-2byvBJ:QUARKUS_DATASOURCE_USERNAME::
     }
