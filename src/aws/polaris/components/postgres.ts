@@ -10,8 +10,9 @@ export class PolarisPostgresDB {
             default: true
         });
 
+        // Can't replace this when RDS is still in use.
         const rdsSecurityGroup = new aws.ec2.SecurityGroup("RdsSecurityGroup", {
-            name: "allow_tls",
+            name: "polaris-rds-sg",
             description: "Security group for RDS instance",
             vpcId: defaultVpc.id
         });
@@ -38,7 +39,8 @@ export class PolarisPostgresDB {
             username: cfg.requireSecret("polarisUser"),
             password: cfg.requireSecret("polarisPwd"),
             vpcSecurityGroupIds: [rdsSecurityGroup.id],
-            publiclyAccessible: true
+            publiclyAccessible: true,
+            skipFinalSnapshot: true
         });
     }
 }

@@ -84,7 +84,7 @@ export class PolarisECS {
                 portMappings: [{containerPort: 8081, protocol: 'tcp'}],
                 environment: [
                     {name: 'POLARIS_PERSISTENCE_TYPE', value: 'relational-jdbc'},
-                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: polarisDb.address},
+                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: pulumi.interpolate`${polarisDb.address}:5432/polaris`},
                     {name: 'POLARIS_REALM_CONTEXT_REALMS', value: 'POLARIS'},
                     {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'true'},
                 ],
@@ -93,14 +93,14 @@ export class PolarisECS {
                         name: 'QUARKUS_DATASOURCE_USERNAME',
                         valueFrom: currentIdentity.then(
                             identity =>
-                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ/QUARKUS_DATASOURCE_USERNAME`
+                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ`
                         )
                     },
                     {
                         name: 'QUARKUS_DATASOURCE_PASSWORD',
                         valueFrom: currentIdentity.then(
                             identity =>
-                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ/QUARKUS_DATASOURCE_PASSWORD`
+                                `arn:aws:secretsmanager:us-east-1:${identity.accountId}:secret:dev/polaris/postgres-2byvBJ`
                         )
                     }
                 ]
@@ -121,5 +121,48 @@ export class PolarisECS {
             },
             skipDestroy: false,
         });
+
+        const defaultVpc = aws.ec2.getVpcOutput({
+            default: true
+        });
+
+        const subnets = aws.ec2.getSubnetsOutput({
+            filters: [
+                {
+                    name: "vpc-id",
+                    values: [defaultVpc.id],
+                },
+            ],
+        });
+
+        const ecsSecurityGroup = new aws.ec2.SecurityGroup("EcsSecurityGroup", {
+            name: "polaris-ecs-sg",
+            description: "Security group for RDS instance",
+            vpcId: defaultVpc.id
+        });
+
+        new aws.vpc.SecurityGroupEgressRule("AllowAllEgress", {
+            securityGroupId: ecsSecurityGroup.id,
+            ipProtocol: "-1",
+            cidrIpv4: "0.0.0.0/0"
+        });
+
+
+        // new awsx.ecs.FargateService("PolarisService", {
+        //     name: "polaris",
+        //     cluster: cluster.arn,
+        //     forceNewDeployment: true,
+        //     desiredCount: 1,
+        //     forceDelete: true,
+        //     deploymentCircuitBreaker: {enable: true, rollback: true},
+        //     networkConfiguration: {
+        //         subnets: subnets.ids,
+        //         assignPublicIp: true,
+        //         securityGroups: [ecsSecurityGroup.id]
+        //     },
+        //     taskDefinition: taskDefinition.taskDefinition.arn
+        // });
+
+        // arn:aws:secretsmanager:us-east-1:429414942599:secret:dev/polaris/postgres-2byvBJ:QUARKUS_DATASOURCE_USERNAME::
     }
 }
