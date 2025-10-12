@@ -161,12 +161,52 @@ export class PolarisECS {
             cidrIpv4: "0.0.0.0/0"
         });
 
-        // const albSecurityGroup = new aws.ec2.SecurityGroup("AlbSecurityGroup", {
-        //     name: "polaris-alb-sg",
-        //     description: "Security group for ALB",
-        //     vpcId: defaultVpc.id
+        const cert = new aws.acm.Certificate("PolarisCert", {
+            domainName: "benjaminforleo.com",
+            validationMethod: "DNS",
+            region: "us-east-1",
+        });
+
+        const zone = aws.route53.getZone({ name: "benjaminforleo.com" });
+
+        // Needed this to validate the certificate
+        const certValidationRecord = new aws.route53.Record("PolarisCertValidation", {
+            name: cert.domainValidationOptions[0].resourceRecordName,
+            zoneId: zone.then(z => z.zoneId),
+            type: cert.domainValidationOptions[0].resourceRecordType,
+            records: [cert.domainValidationOptions[0].resourceRecordValue],
+            ttl: 60,
+        });
+
+        const certValidation = new aws.acm.CertificateValidation("PolarisCertValidation", {
+            certificateArn: cert.arn,
+            validationRecordFqdns: [certValidationRecord.fqdn],
+        });
+
+        const albSecurityGroup = new aws.ec2.SecurityGroup("AlbSecurityGroup", {
+            name: "polaris-alb-sg",
+            description: "Security group for ALB",
+            vpcId: defaultVpc.id
+        });
+
+        new aws.vpc.SecurityGroupIngressRule("PolarisHttpsIngress", {
+            securityGroupId: albSecurityGroup.id,
+            ipProtocol: "tcp",
+            fromPort: 443,
+            toPort: 443,
+            cidrIpv4: "0.0.0.0/0"
+        })
+
+
+        // const alb = new awsx.lb.ApplicationLoadBalancer("myAlb", {
+        //     defaultTargetGroup: {
+        //         port: 80,
+        //     },
+        //     securityGroups: [], // Add your security group IDs
+        //     subnets: [], // Add your subnet IDs
         // });
-        //
+
+
         // const alb = new awsx.lb.ApplicationLoadBalancer('PolarisALB', {
         //     name: 'polaris-alb',
         //     internal: false,
