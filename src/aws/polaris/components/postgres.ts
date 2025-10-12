@@ -2,7 +2,7 @@ import * as aws from "@pulumi/aws";
 import {Config} from "@pulumi/pulumi";
 
 
-export class PolarisPostgresDB {
+export class PolarisDBResources {
     public readonly rdsInstance: aws.rds.Instance;
     constructor(cfg: Config) {
 

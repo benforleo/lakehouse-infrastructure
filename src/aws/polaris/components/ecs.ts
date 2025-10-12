@@ -1,9 +1,18 @@
 import * as aws from '@pulumi/aws'
 import * as awsx from '@pulumi/awsx'
 import * as pulumi from "@pulumi/pulumi";
+import {PolarisDBResources} from "./postgres";
+import {EcrResources} from "./ecr";
+
+
+interface PolarisEcsProps {
+    ecrResources: EcrResources;
+    dbResources: PolarisDBResources;
+
+}
 
 export class PolarisECS {
-    constructor(config: pulumi.Config, polarisDb: aws.rds.Instance) {
+    constructor(config: pulumi.Config, props: PolarisEcsProps) {
 
         const currentIdentity = aws.getCallerIdentity({});
 
@@ -79,13 +88,13 @@ export class PolarisECS {
 
         const taskDefinition = new awsx.ecs.FargateTaskDefinition("PolarisTask", {
             container: {
-                image: currentIdentity.then(identity => `${identity.accountId}.dkr.ecr.us-east-1.amazonaws.com/polaris:1.1.0-incubating`),
+                image: pulumi.interpolate`${props.ecrResources.polarisRepo.repositoryUrl}:1.1.0-incubating`,
                 name: 'polaris',
                 essential: true,
                 portMappings: [{containerPort: 8081, protocol: 'tcp'}],
                 environment: [
                     {name: 'POLARIS_PERSISTENCE_TYPE', value: 'relational-jdbc'},
-                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: pulumi.interpolate`jdbc:postgresql://${polarisDb.address}:5432/polaris`},
+                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: pulumi.interpolate`jdbc:postgresql://${props.dbResources.rdsInstance.address}:5432/polaris`},
                     {name: 'POLARIS_REALM_CONTEXT_REALMS', value: 'POLARIS'},
                     {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'true'},
                 ],
@@ -152,6 +161,19 @@ export class PolarisECS {
             cidrIpv4: "0.0.0.0/0"
         });
 
+        // const albSecurityGroup = new aws.ec2.SecurityGroup("AlbSecurityGroup", {
+        //     name: "polaris-alb-sg",
+        //     description: "Security group for ALB",
+        //     vpcId: defaultVpc.id
+        // });
+        //
+        // const alb = new awsx.lb.ApplicationLoadBalancer('PolarisALB', {
+        //     name: 'polaris-alb',
+        //     internal: false,
+        //     securityGroups: [albSecurityGroup.id],
+        //
+        // });
+
 
         new awsx.ecs.FargateService("PolarisService", {
             name: "polaris",
@@ -169,6 +191,5 @@ export class PolarisECS {
             taskDefinition: taskDefinition.taskDefinition.arn
         });
 
-        // arn:aws:secretsmanager:us-east-1:429414942599:secret:dev/polaris/postgres-2byvBJ:QUARKUS_DATASOURCE_USERNAME::
     }
 }
