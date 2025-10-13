@@ -94,7 +94,10 @@ export class PolarisECS {
                 portMappings: [{containerPort: 8081, protocol: 'tcp'}],
                 environment: [
                     {name: 'POLARIS_PERSISTENCE_TYPE', value: 'relational-jdbc'},
-                    {name: 'QUARKUS_DATASOURCE_JDBC_URL', value: pulumi.interpolate`jdbc:postgresql://${props.dbResources.rdsInstance.address}:5432/polaris`},
+                    {
+                        name: 'QUARKUS_DATASOURCE_JDBC_URL',
+                        value: pulumi.interpolate`jdbc:postgresql://${props.dbResources.rdsInstance.address}:5432/polaris`
+                    },
                     {name: 'POLARIS_REALM_CONTEXT_REALMS', value: 'POLARIS'},
                     {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'true'},
                 ],
@@ -140,6 +143,7 @@ export class PolarisECS {
             default: true
         });
 
+
         const subnets = aws.ec2.getSubnetsOutput({
             filters: [
                 {
@@ -161,13 +165,14 @@ export class PolarisECS {
             cidrIpv4: "0.0.0.0/0"
         });
 
+        // CERTIFICATE VALIDATION //
         const cert = new aws.acm.Certificate("PolarisCert", {
             domainName: "benjaminforleo.com",
             validationMethod: "DNS",
             region: "us-east-1",
         });
 
-        const zone = aws.route53.getZone({ name: "benjaminforleo.com" });
+        const zone = aws.route53.getZone({name: "benjaminforleo.com"});
 
         // Needed this to validate the certificate
         const certValidationRecord = new aws.route53.Record("PolarisCertValidation", {
@@ -183,13 +188,17 @@ export class PolarisECS {
             validationRecordFqdns: [certValidationRecord.fqdn],
         });
 
+        /////// Application Load Balancer ///////
+
+        // Security group for the ALB
         const albSecurityGroup = new aws.ec2.SecurityGroup("AlbSecurityGroup", {
             name: "polaris-alb-sg",
             description: "Security group for ALB",
             vpcId: defaultVpc.id
         });
 
-        new aws.vpc.SecurityGroupIngressRule("PolarisHttpsIngress", {
+        // Allow traffic from the internet to the ALB on port 443
+        new aws.vpc.SecurityGroupIngressRule("AlbHttpsIngress", {
             securityGroupId: albSecurityGroup.id,
             ipProtocol: "tcp",
             fromPort: 443,
@@ -197,39 +206,84 @@ export class PolarisECS {
             cidrIpv4: "0.0.0.0/0"
         })
 
-
-        // const alb = new awsx.lb.ApplicationLoadBalancer("myAlb", {
-        //     defaultTargetGroup: {
-        //         port: 80,
-        //     },
-        //     securityGroups: [], // Add your security group IDs
-        //     subnets: [], // Add your subnet IDs
-        // });
-
-
-        // const alb = new awsx.lb.ApplicationLoadBalancer('PolarisALB', {
-        //     name: 'polaris-alb',
-        //     internal: false,
-        //     securityGroups: [albSecurityGroup.id],
-        //
-        // });
-
-
-        new awsx.ecs.FargateService("PolarisService", {
-            name: "polaris",
-            platformVersion: "1.4.0",
-            cluster: cluster.arn,
-            forceNewDeployment: true,
-            desiredCount: 1,
-            forceDelete: true,
-            deploymentCircuitBreaker: {enable: true, rollback: true},
-            networkConfiguration: {
-                subnets: subnets.ids,
-                assignPublicIp: true,
-                securityGroups: [ecsSecurityGroup.id]
-            },
-            taskDefinition: taskDefinition.taskDefinition.arn
+        // Allow traffic from the ALB to the ECS tasks on all ports
+        new aws.vpc.SecurityGroupEgressRule('AlbHttpsEgress', {
+            securityGroupId: albSecurityGroup.id,
+            ipProtocol: '-1',
+            referencedSecurityGroupId: ecsSecurityGroup.id
         });
 
+        const polarisAlb = new aws.alb.LoadBalancer("PolarisAlb", {
+            name: "polaris-alb",
+            internal: false,
+            loadBalancerType: "application",
+            securityGroups: [albSecurityGroup.id],
+            subnets: subnets.ids,
+            enableDeletionProtection: false,
+        });
+
+        const polarisTargetGroup = new aws.alb.TargetGroup("PolarisTargetGroup", {
+            name: "polaris-tg",
+            port: 8081,
+            protocol: "HTTP",
+            targetType: "ip",
+            vpcId: defaultVpc.id,
+            // healthCheck: {
+            //     enabled: false
+            // }
+        });
+
+        new aws.alb.Listener("PolarisAlbHttpsListener", {
+            loadBalancerArn: polarisAlb.arn,
+            port: 443,
+            protocol: "HTTPS",
+            sslPolicy: "ELBSecurityPolicy-2016-08",
+            certificateArn: certValidation.certificateArn,
+            defaultActions: [{
+                type: "forward",
+                targetGroupArn: polarisTargetGroup.arn
+            }]
+        });
+
+        new aws.route53.Record("albAlias", {
+            name: "benjaminforleo.com",
+            zoneId: zone.then(z => z.zoneId),
+            type: "A",
+            aliases: [{
+                name: polarisAlb.dnsName,
+                zoneId: polarisAlb.zoneId,
+                evaluateTargetHealth: true,
+            }],
+        });
+
+        new aws.vpc.SecurityGroupIngressRule("EcsFromAlb", {
+            securityGroupId: ecsSecurityGroup.id,
+            ipProtocol: "tcp",
+            fromPort: 8081,
+            toPort: 8081,
+            referencedSecurityGroupId: albSecurityGroup.id
+        });
+
+        // new awsx.ecs.FargateService("PolarisService", {
+        //     name: "polaris",
+        //     platformVersion: "1.4.0",
+        //     cluster: cluster.arn,
+        //     forceNewDeployment: true,
+        //     desiredCount: 1,
+        //     forceDelete: true,
+        //     deploymentCircuitBreaker: {enable: true, rollback: true},
+        //     networkConfiguration: {
+        //         subnets: subnets.ids,
+        //         assignPublicIp: true,
+        //         securityGroups: [ecsSecurityGroup.id]
+        //     },
+        //     taskDefinition: taskDefinition.taskDefinition.arn,
+        //     loadBalancers: [{
+        //         targetGroupArn: polarisTargetGroup.arn,
+        //         containerName: "polaris",
+        //         containerPort: 8081
+        //     }]
+        // });
+
     }
-}
+    }
