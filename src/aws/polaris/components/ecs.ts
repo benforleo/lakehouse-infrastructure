@@ -91,7 +91,7 @@ export class PolarisECS {
                 image: pulumi.interpolate`${props.ecrResources.polarisRepo.repositoryUrl}:1.1.0-incubating`,
                 name: 'polaris',
                 essential: true,
-                portMappings: [{containerPort: 8081, protocol: 'tcp'}],
+                portMappings: [{containerPort: 8181, protocol: 'tcp'}, {containerPort: 8182, protocol: 'tcp'}],
                 environment: [
                     {name: 'POLARIS_PERSISTENCE_TYPE', value: 'relational-jdbc'},
                     {
@@ -99,7 +99,7 @@ export class PolarisECS {
                         value: pulumi.interpolate`jdbc:postgresql://${props.dbResources.rdsInstance.address}:5432/polaris`
                     },
                     {name: 'POLARIS_REALM_CONTEXT_REALMS', value: 'POLARIS'},
-                    {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'true'},
+                    {name: 'POLARIS_REALM_CONTEXT_REQUIRE_HEADER', value: 'false'},
                 ],
                 secrets: [
                     {
@@ -224,13 +224,15 @@ export class PolarisECS {
 
         const polarisTargetGroup = new aws.alb.TargetGroup("PolarisTargetGroup", {
             name: "polaris-tg",
-            port: 8081,
+            port: 8181,
             protocol: "HTTP",
             targetType: "ip",
             vpcId: defaultVpc.id,
-            // healthCheck: {
-            //     enabled: false
-            // }
+            healthCheck: {
+                enabled: true,
+                port: '8182',
+                path: '/healthcheck'
+            }
         });
 
         new aws.alb.Listener("PolarisAlbHttpsListener", {
@@ -259,8 +261,8 @@ export class PolarisECS {
         new aws.vpc.SecurityGroupIngressRule("EcsFromAlb", {
             securityGroupId: ecsSecurityGroup.id,
             ipProtocol: "tcp",
-            fromPort: 8081,
-            toPort: 8081,
+            fromPort: 8181,
+            toPort: 8182,
             referencedSecurityGroupId: albSecurityGroup.id
         });
 
@@ -281,7 +283,11 @@ export class PolarisECS {
         //     loadBalancers: [{
         //         targetGroupArn: polarisTargetGroup.arn,
         //         containerName: "polaris",
-        //         containerPort: 8081
+        //         containerPort: 8181
+        //     }, {
+        //         targetGroupArn: polarisTargetGroup.arn,
+        //         containerName: "polaris",
+        //         containerPort: 8182
         //     }]
         // });
 
