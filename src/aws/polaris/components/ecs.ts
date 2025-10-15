@@ -266,30 +266,25 @@ export class PolarisECS {
             referencedSecurityGroupId: albSecurityGroup.id
         });
 
-        // new awsx.ecs.FargateService("PolarisService", {
-        //     name: "polaris",
-        //     platformVersion: "1.4.0",
-        //     cluster: cluster.arn,
-        //     forceNewDeployment: true,
-        //     desiredCount: 1,
-        //     forceDelete: true,
-        //     deploymentCircuitBreaker: {enable: true, rollback: true},
-        //     networkConfiguration: {
-        //         subnets: subnets.ids,
-        //         assignPublicIp: true,
-        //         securityGroups: [ecsSecurityGroup.id]
-        //     },
-        //     taskDefinition: taskDefinition.taskDefinition.arn,
-        //     loadBalancers: [{
-        //         targetGroupArn: polarisTargetGroup.arn,
-        //         containerName: "polaris",
-        //         containerPort: 8181
-        //     }, {
-        //         targetGroupArn: polarisTargetGroup.arn,
-        //         containerName: "polaris",
-        //         containerPort: 8182
-        //     }]
-        // });
-
+        new awsx.ecs.FargateService("PolarisService", {
+            name: "polaris",
+            platformVersion: "1.4.0",
+            cluster: cluster.arn,
+            forceNewDeployment: true,
+            desiredCount: 1,
+            forceDelete: true,
+            deploymentCircuitBreaker: {enable: true, rollback: true},
+            networkConfiguration: {
+                subnets: subnets.ids,
+                assignPublicIp: true,
+                securityGroups: [ecsSecurityGroup.id]
+            },
+            taskDefinition: taskDefinition.taskDefinition.arn,
+            loadBalancers: [{
+                targetGroupArn: polarisTargetGroup.arn,
+                containerName: "polaris",
+                containerPort: 8181
+            }]
+        });
     }
-    }
+}
