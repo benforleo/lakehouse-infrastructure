@@ -1,13 +1,15 @@
 {
-    "name": "snowflake-pulumi",
-    "main": "src/index.ts",
-    "devDependencies": {
-        "@types/node": "^18",
-        "typescript": "^5.0.0"
-    },
-    "dependencies": {
-        "@pulumi/pulumi": "^3.201.0",
-        "@pulumi/snowflake": "^2.7.0",
-        "@pulumi/aws": "^7.8.0"
-    }
+  "name": "snowflake-pulumi",
+  "main": "src/index.ts",
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.201.0",
+    "@pulumi/snowflake": "^2.7.0",
+    "@pulumi/aws": "^7.8.0",
+    "@pulumi/awsx": "^3.0.0",
+    "@pulumi/command": "^1.1.3"
+  }
 }

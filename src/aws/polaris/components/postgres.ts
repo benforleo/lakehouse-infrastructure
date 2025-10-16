@@ -2,16 +2,17 @@ import * as aws from "@pulumi/aws";
 import {Config} from "@pulumi/pulumi";
 
 
-export class PolarisPostgresDB {
-
+export class PolarisDBResources {
+    public readonly rdsInstance: aws.rds.Instance;
     constructor(cfg: Config) {
 
         const defaultVpc = aws.ec2.getVpcOutput({
             default: true
         });
 
+        // Can't replace this when RDS is still in use.
         const rdsSecurityGroup = new aws.ec2.SecurityGroup("RdsSecurityGroup", {
-            name: "allow_tls",
+            name: "polaris-rds-sg",
             description: "Security group for RDS instance",
             vpcId: defaultVpc.id
         });
@@ -24,7 +25,7 @@ export class PolarisPostgresDB {
             cidrIpv4: "0.0.0.0/0",
         });
 
-        const rdsInstance = new aws.rds.Instance("PolarisPostgresDB", {
+        this.rdsInstance = new aws.rds.Instance("PolarisPostgresDB", {
             identifier: "polaris-postgres-db",
             instanceClass: aws.rds.InstanceType.T4G_Micro,
             allowMajorVersionUpgrade: false,
@@ -38,7 +39,8 @@ export class PolarisPostgresDB {
             username: cfg.requireSecret("polarisUser"),
             password: cfg.requireSecret("polarisPwd"),
             vpcSecurityGroupIds: [rdsSecurityGroup.id],
-            publiclyAccessible: true
+            publiclyAccessible: true,
+            skipFinalSnapshot: true
         });
     }
 }

@@ -1,15 +1,11 @@
-import * as dbt from './dbt-config/dbt-config';
-import * as ecr from './polaris/ecr';
-import { PolarisPostgresDB } from './polaris/postgres';
-
 import * as pulumi from "@pulumi/pulumi";
 
-const config = new pulumi.Config();
+import { Polaris } from './aws/polaris/polaris';
 
-new PolarisPostgresDB(config);
-new ecr.ECR();
-new dbt.SnowflakeDBTTrainingResources();
+function main() {
+    const config = new pulumi.Config();
+    new Polaris(config)
+    // new dbt.SnowflakeDBTTrainingResources();
+}
 
-
-
-
+main();

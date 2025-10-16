@@ -1,7 +1,7 @@
 import * as aws from "@pulumi/aws";
+import * as command from "@pulumi/command";
 
-
-export class ECR {
+export class EcrResources {
     public readonly polarisRepo: aws.ecr.Repository;
 
     constructor() {
@@ -33,5 +33,11 @@ export class ECR {
                 ]
             })
         });
+
+        new command.local.Command("PushPolarisImage", {
+            create: "zsh deploy/push-polaris.sh",
+            update: "zsh deploy/push-polaris.sh",
+        }, {dependsOn: [this.polarisRepo]});
+
     }
 }
