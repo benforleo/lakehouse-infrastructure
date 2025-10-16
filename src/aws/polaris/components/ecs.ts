@@ -40,9 +40,11 @@ export class PolarisECS {
                             {
                                 Effect: "Allow",
                                 Action: [
-                                    "secretsmanager:*",
-                                    // "secretsmanager:GetSecretValue",
-                                    // "secretsmanager:DescribeSecret"
+                                    "secretsmanager:BatchGetSecretValue",
+                                    "secretsmanager:GetResourcePolicy",
+                                    "secretsmanager:GetSecretValue",
+                                    "secretsmanager:DescribeSecret",
+                                    "secretsmanager:List*"
                                 ],
                                 Resource: "*"
                             }
