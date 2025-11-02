@@ -39,16 +39,31 @@ export class PolarisDBResources {
             engineVersion: "16",
             iamDatabaseAuthenticationEnabled: true,
             region: "us-east-1",
-            username: cfg.requireSecret("polarisUser"),
-            password: cfg.requireSecret("polarisPwd"),
+            username: cfg.requireSecret("polarisDbUser"),
+            password: cfg.requireSecret("polarisDbPwd"),
             vpcSecurityGroupIds: [rdsSecurityGroup.id],
             publiclyAccessible: true,
             skipFinalSnapshot: true
         });
 
+        // Build the bootstrap command from parts so we can handle Outputs (secrets, addresses) cleanly.
+        const parts = [
+            'zsh',
+            'deploy/bootstrap-db.sh',
+            '--db-host', this.rdsInstance.address,
+            '--db-user', cfg.requireSecret('polarisDbUser'),
+            '--db-pass', cfg.requireSecret('polarisDbPwd'),
+            '--polaris-user', cfg.requireSecret('polarisAdminUser'),
+            '--polaris-pass', cfg.requireSecret('polarisAdminPwd'),
+            '--version', cfg.get('polarisVersion') || '1.2.0-incubating',
+        ];
+
+        const partsAsOutputs = parts.map(p => pulumi.output(p));
+        const bootstrapCommand: pulumi.Output<string> = pulumi.all(partsAsOutputs).apply(ps => ps.join(' '));
+
         new command.local.Command("BootstrapPolarisDB", {
-            create: pulumi.interpolate`zsh deploy/bootstrap-db.sh --db-host ${this.rdsInstance.address} --db-user ${cfg.requireSecret("polarisUser")} --db-pass ${cfg.requireSecret("polarisPwd")} --polaris-user ${cfg.requireSecret("polarisUser")} --polaris-pass ${cfg.requireSecret("polarisAdminPwd")} --version ${cfg.get("polarisVersion") || "1.2.0-incubating"}`,
-            update: pulumi.interpolate`zsh deploy/bootstrap-db.sh --db-host ${this.rdsInstance.address} --db-user ${cfg.requireSecret("polarisUser")} --db-pass ${cfg.requireSecret("polarisPwd")} --polaris-user ${cfg.requireSecret("polarisAdminUser")} --polaris-pass ${cfg.requireSecret("polarisAdminPwd")} --version ${cfg.get("polarisVersion") || "1.2.0-incubating"}`,
+            create: bootstrapCommand,
+            update: bootstrapCommand,
         }, {dependsOn: [this.rdsInstance]});
     }
 }

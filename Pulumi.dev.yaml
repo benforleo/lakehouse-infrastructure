@@ -12,9 +12,9 @@ config:
   aws:defaultTags:
     tags:
       project: data-lakehouse
-  lakehouse:polarisUser:
+  lakehouse:polarisDbUser:
     secure: v1:Br+kG9Wlpy84Qnr9:jvFuy2iFfQ9cjo6F/NGvhFw7Rn6U5rc=
-  lakehouse:polarisPwd:
+  lakehouse:polarisDbPwd:
     secure: v1:sWuHkNAPVZ8TK6O8:4jp9uPFy7iCAeELr4DwZ/nYTyrWSbOqEapRKk5CpMX4=
   lakehouse:polarisVersion: 1.2.0-incubating
   lakehouse:polarisAdminUser:
