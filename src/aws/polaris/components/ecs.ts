@@ -15,6 +15,7 @@ export class PolarisECS {
     constructor(config: pulumi.Config, props: PolarisEcsProps) {
 
         const currentIdentity = aws.getCallerIdentity({});
+        const version = config.get("polarisVersion") || "1.2.0-incubating";
 
         const executionRole = new aws.iam.Role("PolarisExecutionRole", {
             name: 'polaris-execution-role',
@@ -90,7 +91,7 @@ export class PolarisECS {
 
         const taskDefinition = new awsx.ecs.FargateTaskDefinition("PolarisTask", {
             container: {
-                image: pulumi.interpolate`${props.ecrResources.polarisRepo.repositoryUrl}:1.1.0-incubating`,
+                image: pulumi.interpolate`${props.ecrResources.polarisRepo.repositoryUrl}:${version}`,
                 name: 'polaris',
                 essential: true,
                 portMappings: [{containerPort: 8181, protocol: 'tcp'}, {containerPort: 8182, protocol: 'tcp'}],
