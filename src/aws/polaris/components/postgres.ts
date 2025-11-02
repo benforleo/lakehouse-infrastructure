@@ -1,9 +1,12 @@
 import * as aws from "@pulumi/aws";
 import {Config} from "@pulumi/pulumi";
+import * as command from "@pulumi/command";
+import * as pulumi from "@pulumi/pulumi";
 
 
 export class PolarisDBResources {
     public readonly rdsInstance: aws.rds.Instance;
+
     constructor(cfg: Config) {
 
         const defaultVpc = aws.ec2.getVpcOutput({
@@ -42,6 +45,10 @@ export class PolarisDBResources {
             publiclyAccessible: true,
             skipFinalSnapshot: true
         });
+
+        new command.local.Command("BootstrapPolarisDB", {
+            create: pulumi.interpolate`zsh deploy/bootstrap-db.sh --db-host ${this.rdsInstance.address} --db-user ${cfg.requireSecret("polarisUser")} --db-pass ${cfg.requireSecret("polarisPwd")} --polaris-user ${cfg.requireSecret("polarisUser")} --polaris-pass ${cfg.requireSecret("polarisAdminPwd")} --version ${cfg.get("polarisVersion") || "1.2.0-incubating"}`,
+            update: pulumi.interpolate`zsh deploy/bootstrap-db.sh --db-host ${this.rdsInstance.address} --db-user ${cfg.requireSecret("polarisUser")} --db-pass ${cfg.requireSecret("polarisPwd")} --polaris-user ${cfg.requireSecret("polarisAdminUser")} --polaris-pass ${cfg.requireSecret("polarisAdminPwd")} --version ${cfg.get("polarisVersion") || "1.2.0-incubating"}`,
+        }, {dependsOn: [this.rdsInstance]});
     }
 }
-
